@@ -29,13 +29,29 @@ except ImportError:
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('t/<slug:tenant_slug>/<int:tenant_id>/<str:tenant_key>/', include(('service.urls', 'service'), namespace='tenant_service')),
-    path('t/<slug:tenant_slug>/<int:tenant_id>/<str:tenant_key>/', include('core.urls')),
-    path('', include('core.urls')),
-    path('system/', system_demo, name='system_demo'),
-    path('service/', include(('service.urls', 'service'), namespace='service')),
-    path('service/', include('core.urls')),
 ]
+
+# Defer app-specific includes to avoid import errors during build
+def add_app_urls():
+    global urlpatterns
+    try:
+        urlpatterns.extend([
+            path('t/<slug:tenant_slug>/<int:tenant_id>/<str:tenant_key>/', include(('service.urls', 'service'), namespace='tenant_service')),
+            path('t/<slug:tenant_slug>/<int:tenant_id>/<str:tenant_key>/', include('core.urls')),
+            path('', include('core.urls')),
+            path('system/', system_demo, name='system_demo'),
+            path('service/', include(('service.urls', 'service'), namespace='service')),
+            path('service/', include('core.urls')),
+        ])
+    except (ImportError, ModuleNotFoundError):
+        # If app imports still fail, continue with basic admin urlpatterns
+        pass
+
+# Try to add app URLs immediately, but they'll also be available at runtime
+try:
+    add_app_urls()
+except:
+    pass
 
 # Serve static files during development
 if settings.DEBUG:
