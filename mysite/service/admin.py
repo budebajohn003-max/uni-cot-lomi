@@ -27,9 +27,10 @@ if Member is not None:
         ordering = ['-created_at']
 
 
-@admin.register(Comment)
-class CommentAdmin(admin.ModelAdmin):
-    list_display = ['member', 'owner', 'status', 'created_at']
-    list_filter = ['status', 'created_at']
-    search_fields = ['member__reg_number', 'owner__email', 'content']
-    ordering = ['-created_at']
+if Comment is not None:
+    @admin.register(Comment)
+    class CommentAdmin(admin.ModelAdmin):
+        list_display = ['member', 'owner', 'status', 'created_at']
+        list_filter = ['status', 'created_at']
+        search_fields = ['member__reg_number', 'owner__email', 'content']
+        ordering = ['-created_at']
