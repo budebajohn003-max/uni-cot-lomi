@@ -18,7 +18,14 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from service.views import system_demo
+
+try:
+    from service.views import system_demo
+except ImportError:
+    # Define a fallback view if service.views can't be imported during build
+    def system_demo(request):
+        from django.http import HttpResponse
+        return HttpResponse("System demo not available during build phase")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
