@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -48,21 +49,50 @@ CSRF_TRUSTED_ORIGINS = env_list(
     'http://localhost:8000,http://*.localhost:8000' if DEBUG else '',
 )
 
-POSTGRES_SETTINGS = {
-    'NAME': os.getenv('POSTGRES_DB'),
-    'USER': os.getenv('POSTGRES_USER'),
-    'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
-    'HOST': os.getenv('POSTGRES_HOST'),
-    'PORT': os.getenv('POSTGRES_PORT', '5432'),
-}
-POSTGRES_CONFIGURED = all(POSTGRES_SETTINGS.values())
-USE_TENANT_INFRA = True
+# Database configuration - Support both Render's DATABASE_URL and individual POSTGRES_* vars
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
+    # Use Render's DATABASE_URL
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django_tenants.postgresql_backend',
+            **dj_database_url.config(default=DATABASE_URL, conn_max_age=600, conn_health_checks=True),
+            'OPTIONS': {
+                'options': '-c client_encoding=UTF8',
+                'sslmode': 'require',
+            },
+        }
+    }
+    POSTGRES_CONFIGURED = True
+else:
+    # Fallback to individual POSTGRES_* environment variables for local development
+    POSTGRES_SETTINGS = {
+        'NAME': os.getenv('POSTGRES_DB'),
+        'USER': os.getenv('POSTGRES_USER'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
+        'HOST': os.getenv('POSTGRES_HOST'),
+        'PORT': os.getenv('POSTGRES_PORT', '5432'),
+    }
+    POSTGRES_CONFIGURED = all(POSTGRES_SETTINGS.values())
+    
+    if not POSTGRES_CONFIGURED:
+        raise ImproperlyConfigured(
+            "PostgreSQL tenant settings are required. "
+            "Set DATABASE_URL or set POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, and POSTGRES_PORT."
+        )
+    
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django_tenants.postgresql_backend',
+            **POSTGRES_SETTINGS,
+            'OPTIONS': {
+                'options': '-c client_encoding=UTF8',
+                'sslmode': os.getenv('POSTGRES_SSLMODE', 'require'),
+            },
+        }
+    }
 
-if not POSTGRES_CONFIGURED:
-    raise ImproperlyConfigured(
-        "PostgreSQL tenant settings are required. "
-        "Set POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, and POSTGRES_PORT."
-    )
+USE_TENANT_INFRA = env_bool('DJANGO_USE_TENANT_INFRA', default=True)
 
 
 # ============================================================
@@ -201,22 +231,6 @@ if USE_TENANT_INFRA:
         'django_tenants.middleware.main.TenantMainMiddleware',
         *MIDDLEWARE,
     ]
-
-
-# ============================================================
-# DATABASE - Must use django-tenants backend!
-# ============================================================
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django_tenants.postgresql_backend',
-        **POSTGRES_SETTINGS,
-        'OPTIONS': {
-            'options': '-c client_encoding=UTF8',
-            'sslmode': os.getenv('POSTGRES_SSLMODE', 'require'),
-        },
-    }
-}
 
 
 # ============================================================
